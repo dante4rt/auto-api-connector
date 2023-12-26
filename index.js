@@ -5,23 +5,28 @@ import readlineSync from 'readline-sync';
 
 // Function to make a single request
 async function makeRequest() {
-    const response = await axios.get(process.env.TARGET_LINK);
-    const $ = cheerio.load(response.data);
-    const value = $("text[x='102']").first().text().trim();
+    try {
+        const response = await axios.get(process.env.TARGET_LINK);
+        const $ = cheerio.load(response.data);
+        const value = $("text[x='102']").first().text().trim();
 
-    console.log(`Request: ${value}`);
+        console.log(`Request: ${value}`);
+    } catch (error) {
+        console.log(error.message);
+    }
 }
 
-// Function to make requests concurrently
-async function makeConcurrentRequests(numberOfRequests) {
+// Function to make requests with a delay between batches
+async function makeRequestsInBatches(numberOfRequests, batchSize, delayBetweenBatches) {
     try {
-        // Create an array of promises for concurrent requests
-        const requests = Array.from({ length: numberOfRequests }, () => makeRequest());
-
-        // Use Promise.all to wait for all requests to complete
-        await Promise.all(requests);
-
-        // Print "done" message when all requests are completed
+        for (let i = 0; i < numberOfRequests; i += batchSize) {
+            const batch = Array.from({ length: Math.min(batchSize, numberOfRequests - i) }, () => makeRequest());
+            await Promise.all(batch);
+            if (i + batchSize < numberOfRequests) {
+                // Introduce a delay between batches to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+            }
+        }
         console.log("Done");
     } catch (error) {
         console.log(error);
@@ -37,6 +42,10 @@ const numberOfRequests = parseInt(input, 10);
 if (isNaN(numberOfRequests) || numberOfRequests <= 0 || !Number.isInteger(numberOfRequests)) {
     console.log("Please enter a valid positive integer.");
 } else {
+    // Set batch size and delay between batches (adjust as needed)
+    const batchSize = 10;
+    const delayBetweenBatches = 1000; // 1000 milliseconds (1 second)
+
     // Call the function with the user-specified number of requests
-    makeConcurrentRequests(numberOfRequests);
+    makeRequestsInBatches(numberOfRequests, batchSize, delayBetweenBatches);
 }
